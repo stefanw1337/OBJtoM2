@@ -85,6 +85,16 @@ class ConversionTests(unittest.TestCase):
         self.assertFalse(stem.with_suffix('.m2').exists())
         return result.stderr
 
+    def test_static_sequence_bounds_and_selection(self):
+        self.convert(BASE + 'f 1/1/1 2/2/1 3/3/1\n')
+        data = (self.folder / 'model.m2').read_bytes()
+        count, offset = struct.unpack_from('<II', data, 28)
+        self.assertEqual(count, 1)
+        self.assertEqual(struct.unpack_from('<h', data, offset + 16)[0], 32767)
+        self.assertEqual(struct.unpack_from('<7f', data, offset + 32),
+                         struct.unpack_from('<7f', data, 160))
+        self.assertGreater(struct.unpack_from('<f', data, offset + 56)[0], 0)
+
     def test_uv_seam(self):
         vertices, corners, _ = self.convert(BASE + 'f 1/1/1 2/2/1 3/3/1\nf 1/5/1 3/3/1 4/4/1\n')
         self.assertEqual(len(vertices), 5)

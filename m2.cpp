@@ -96,6 +96,13 @@ void m2::saveToFile(std::string path)
 	UpdateCollision();
 	calcBoundingBox();
 	calcVertexBox();
+	if (HasDummyAnimation) {
+		for (auto& anim : Animations) {
+			anim.MinimumExtent = VertexBox[1];
+			anim.MaximumExtent = VertexBox[0];
+			anim.BoundRadius = VertexRadius;
+		}
+	}
 
 	std::cout << "Filling header" << std::endl;
 	fillM2Header(header);
@@ -1441,6 +1448,7 @@ void m2::AddBone(int32 keyBoneId, uint32 flags, Vec3D pivotPoint)
 
 void m2::AddDummyAnim()
 {
+	HasDummyAnimation = true;
 	animation dummy;
 
 	dummy.AnimationID = 0;
@@ -1448,7 +1456,7 @@ void m2::AddDummyAnim()
 	dummy.Length = 3333;
 	dummy.MovingSpeed = 0;
 	dummy.Flags = 32;
-	dummy.Probability = 0;
+	dummy.Probability = 32767;
 	dummy.Unknown0 = 0;
 	dummy.Unknown1 = 0;
 	dummy.Unknown2 = 0;

@@ -142,6 +142,7 @@ private:
 	std::vector<triangle> BoundingTriangles;
 	std::vector<Vec3D> BoundingNormals;
 	bool HasCustomCollision = false;
+	bool HasDummyAnimation = false;
 
 	Vec3D VertexBox[2];
 	float VertexRadius;
