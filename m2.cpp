@@ -1385,7 +1385,21 @@ void m2::AddSubmesh(uint32 id, uint16 StartVertex, uint16 nVertices, uint16 Star
 	mesh.StartBone = 0;
 	mesh.unknown = 1;
 	mesh.RootBone = 0;
-	mesh.radius = 60; // calculate + calc centermass etc.. etc.. 
+	// Section bounds must describe the visible geometry, not its collision.
+	Vec3D low = Vertices.at(StartVertex).Position;
+	Vec3D high = low;
+	mesh.CenterMass = Vec3D();
+	for (uint32 i = StartVertex; i < uint32(StartVertex) + nVertices; ++i) {
+		const Vec3D p = Vertices.at(i).Position;
+		low.x = std::min(low.x, p.x); low.y = std::min(low.y, p.y); low.z = std::min(low.z, p.z);
+		high.x = std::max(high.x, p.x); high.y = std::max(high.y, p.y); high.z = std::max(high.z, p.z);
+		mesh.CenterMass = mesh.CenterMass + p;
+	}
+	mesh.CenterMass = mesh.CenterMass * (1.0f / nVertices);
+	mesh.CenterBoundingBox = (low + high) * 0.5f;
+	mesh.radius = 0;
+	for (uint32 i = StartVertex; i < uint32(StartVertex) + nVertices; ++i)
+		mesh.radius = std::max(mesh.radius, (Vertices.at(i).Position - mesh.CenterBoundingBox).length());
 
 	Views.at(0).Submeshes.push_back(mesh);
 }
@@ -1472,8 +1486,33 @@ void m2::AddDummyTransparency()
 
 // Thanks Shlumpf & Mjollna
 
+
+void m2::SetCollisionMesh(const std::vector<Vec3D>& vertices, const std::vector<triangle>& triangles)
+{
+    if (vertices.empty() || triangles.empty())
+        throw std::runtime_error("Collision mesh must have vertices and triangles");
+    std::vector<Vec3D> normals;
+    for (const auto& tri : triangles) {
+        if (tri.indice1 >= vertices.size() || tri.indice2 >= vertices.size() || tri.indice3 >= vertices.size())
+            throw std::runtime_error("Collision triangle index out of range");
+        const Vec3D u = vertices[tri.indice2] - vertices[tri.indice1];
+        const Vec3D v = vertices[tri.indice3] - vertices[tri.indice1];
+        Vec3D normal = u % v;
+        const float length = normal.length();
+        if (!std::isfinite(length) || length <= 0)
+            throw std::runtime_error("Degenerate collision triangle");
+        normal = normal * (1.0f / length);
+        normals.push_back(normal);
+    }
+    BoundingVertices = vertices;
+    BoundingTriangles = triangles;
+    BoundingNormals = normals;
+    HasCustomCollision = true;
+}
+
 void m2::UpdateCollision()
 {
+	if (HasCustomCollision) return;
 	BoundingVertices.clear();
 	BoundingNormals.clear();
 	BoundingTriangles.clear();
@@ -1536,7 +1575,8 @@ void m2::calcVertexBox()
 	VertexBox[0] = Vec3D(max, may, maz);
 	VertexBox[1] = Vec3D(mix, miy, miz);
 
-	VertexRadius = (VertexBox[0].length() + VertexBox[1].length())/2;
+	VertexRadius = 0;
+	for (const auto& vertex : Vertices) VertexRadius = std::max(VertexRadius, vertex.Position.length());
 }
 
 void m2::calcBoundingBox()
@@ -1561,5 +1601,6 @@ void m2::calcBoundingBox()
 	BoundingBox[0] = Vec3D(max, may, maz);
 	BoundingBox[1] = Vec3D(mix, miy, miz);
 
-	BoundingRadius = (BoundingBox[0].length() + BoundingBox[1].length())/2;
+	BoundingRadius = 0;
+	for (const auto& vertex : BoundingVertices) BoundingRadius = std::max(BoundingRadius, vertex.length());
 }

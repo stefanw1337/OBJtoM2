@@ -23,15 +23,30 @@ TODO
 */
 
 #include "obj_geometry.h"
+#include "collision_geometry.h"
 
 int main(int argc, char **argv)
 {
 	std::cout << "M2Lib | Converter v0.1\n" << "by Garthog\n" << "Thanks to relaxok, schlumpf, gamh, mjollna, zim for code / advices they gave me.\n" << "Thanks to pxr.dk & modcraft" << std::endl;
 
 	m2 output;
-	if (argc != 3 && !(argc == 5 && std::string(argv[3]) == "--texture")) {
-		std::cerr << "Usage: OBJtoM2 <OBJFile> <OutputStem> [--texture <ArchivePath.blp>]\n";
+	std::string texturePath, collisionPath;
+	if (argc < 3) {
+		std::cerr << "Usage: OBJtoM2 <OBJFile> <OutputStem> [--texture <ArchivePath.blp>] [--collision <Trunk.obj>]\n";
 		return 1;
+	}
+	for (int i = 3; i < argc; i += 2) {
+		const std::string option = argv[i];
+		if (i + 1 >= argc || (option != "--texture" && option != "--collision")) {
+			std::cerr << "Invalid option or missing value: " << option << std::endl;
+			return 1;
+		}
+		std::string& value = option == "--texture" ? texturePath : collisionPath;
+		if (!value.empty() || !argv[i+1][0]) {
+			std::cerr << "Duplicate option or empty value: " << option << std::endl;
+			return 1;
+		}
+		value = argv[i+1];
 	}
 	obj::Mesh mesh;
 	try { mesh = obj::read(argv[1]); }
@@ -55,16 +70,19 @@ int main(int argc, char **argv)
 
 	output.AddSkin(20);
 
-	try { obj::emit(mesh, output); }
+	try {
+		obj::emit(mesh, output);
+		if (!collisionPath.empty()) loadCollisionOBJ(collisionPath.c_str(), output);
+	}
 	catch (const std::exception& error) {
 		std::cerr << error.what() << std::endl;
 		return 1;
 	}
 	std::cout << "Export vertices: " << output.getVerticeCount()
 	          << " triangles: " << output.getTriangleCount() << std::endl;
-	if (argc == 5) {
+	if (!texturePath.empty()) {
 		// Explicit single-texture mode for static props. No MTL/PBR inference.
-		output.AddTexture(argv[4], 0);
+		output.AddTexture(texturePath, 0);
 		output.AddRenderFlag(0, 0);
 		for (size_t i = 0; i < output.getSkins()->Submeshes.size(); ++i)
 			output.AddTextureUnit(static_cast<uint16>(i), 0, 0);

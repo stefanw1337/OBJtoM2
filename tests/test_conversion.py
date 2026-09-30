@@ -139,6 +139,50 @@ class ConversionTests(unittest.TestCase):
                                 capture_output=True, text=True, timeout=15)
         self.assertNotEqual(result.returncode, 0)
 
+    def test_collision_is_separate_from_visible_geometry(self):
+        source = self.folder / 'input.obj'
+        source.write_text(BASE + 'f 1/1/1 2/2/1 3/3/1\n')
+        collision = self.folder / 'trunk.obj'
+        collision.write_text('v 0 0 0\nv 0.1 0 0\nv 0 0.1 0\nv 0 0 0.5\n'
+                             'f 1 3 2\nf 1 2 4\nf 2 3 4\nf 3 1 4\n')
+        stem = self.folder / 'tree'
+        result = subprocess.run([EXE, str(source), str(stem), '--texture', 'tree.blp',
+                                 '--collision', str(collision)], capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        visible, _, _ = read_output(stem)
+        self.assertEqual(len(visible), 3)
+        data = stem.with_suffix('.m2').read_bytes()
+        nt, ot, nv, ov, nn, on = struct.unpack_from('<6I', data, 216)
+        self.assertEqual((nt, nv, nn), (12, 4, 4))
+        vertices = [struct.unpack_from('<3f', data, ov + i*12) for i in range(nv)]
+        self.assertAlmostEqual(max(v[0] for v in vertices), 0.1)
+        self.assertAlmostEqual(max(v[2] for v in vertices), 0.5)
+        for i in range(nn):
+            n = struct.unpack_from('<3f', data, on + i*12)
+            self.assertAlmostEqual(sum(x*x for x in n), 1.0, places=5)
+        collision_box = struct.unpack_from('<6f', data, 188)
+        self.assertEqual(collision_box[:3], (0, 0, 0))
+        self.assertAlmostEqual(collision_box[3], 0.1)
+        self.assertAlmostEqual(collision_box[5], 0.5)
+        skin = Path(str(stem) + '00.skin').read_bytes()
+        section_offset = struct.unpack_from('<I', skin, 32)[0]
+        center = struct.unpack_from('<3f', skin, section_offset + 32)
+        radius = struct.unpack_from('<f', skin, section_offset + 44)[0]
+        self.assertEqual(center, (0.5, 0.5, 0))
+        self.assertAlmostEqual(radius, math.sqrt(0.5), places=5)
+
+    def test_degenerate_collision_rejected_before_writing(self):
+        source = self.folder / 'input.obj'
+        source.write_text(BASE + 'f 1/1/1 2/2/1 3/3/1\n')
+        collision = self.folder / 'bad.obj'
+        collision.write_text('v 0 0 0\nv 1 0 0\nv 2 0 0\nf 1 2 3\n')
+        stem = self.folder / 'bad'
+        result = subprocess.run([EXE, str(source), str(stem), '--texture', 'tree.blp',
+                                 '--collision', str(collision)], capture_output=True, text=True, timeout=15)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Degenerate collision', result.stderr)
+        self.assertFalse(stem.with_suffix('.m2').exists())
+
 
 if __name__ == '__main__':
     unittest.main()

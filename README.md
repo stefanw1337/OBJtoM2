@@ -33,6 +33,25 @@ at exactly that archive path.
 Omit `--texture` to use the original interactive material commands (`te`, `r`,
 `tu`, `i`, `q`). Use `q` to save; an unexpected end of input aborts without saving.
 
+## Separate trunk collision
+
+```powershell
+.\build\Release\OBJtoM2.exe "oak.obj" "oak" --texture 'World\CustomTrees\oak.blp' --collision "oak_trunk.obj"
+```
+
+`--collision` replaces full-mesh collision with a separate triangulated OBJ.
+Its vertices and faces are used only for collision; UVs and normals are not
+required. Face normals are calculated during export. Empty meshes, invalid
+indices and degenerate triangles are rejected before saving. Author a closed
+proxy with outward-facing triangles, in the **same coordinates and scale** as
+the visible OBJ. For trees, omit foliage from that proxy. Without this option,
+the original full-mesh collision behavior remains.
+
+The converter does not silently rotate or scale either OBJ. Prepare both in
+WoW model space (Z up) with the intended foot position at the origin. For a
+Y-up source, the rotation `(x,y,z) -> (x,-z,y)` preserves handedness. Apply it to
+both geometry and normals; scale both visible and collision meshes together.
+
 ## OBJ requirements and fixes
 
 - Triangular faces with position, UV and normal indices (`v/vt/vn`) are required.
@@ -56,11 +75,12 @@ The regression suite independently parses emitted M2/SKIN files and verifies
 seams, normals, section ranges, index validity and rejected inputs.
 
 This is an experimental static-model converter, not a full audited M2 exporter.
-The inherited writer generates collision from **the entire visible mesh**,
-including foliage, and uses placeholder submesh bounds. Simplified trunk
-collision and proper section bounds remain follow-up work for trees. It does
-not export wind animation, modern PBR materials, or automatically adjust scale
-and axes. A successful conversion is not proof of correct appearance in a game.
+The writer generates collision from **the entire visible mesh** unless
+`--collision` is supplied. Section centers/radii now come from the visible
+geometry, while collision bounds come from the selected collision mesh.
+Regression tests verify that these remain independent. It does not export wind
+animation, modern PBR materials, or automatically adjust scale and axes.
+A successful conversion is not proof of correct appearance in a game.
 
 Preview the model and validate scale, orientation, materials, bounds and collision
 in the target client before deploying an MPQ replacement. No game data is modified

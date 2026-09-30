@@ -47,6 +47,7 @@ public:
 	void AddDummyAnim();
 	void AddDummyTransparency();
 	void UpdateCollision();
+	void SetCollisionMesh(const std::vector<Vec3D>& vertices, const std::vector<triangle>& triangles);
 	void FlipTex();
 
 	//Get function
@@ -140,6 +141,7 @@ private:
 	std::vector<Vec3D> BoundingVertices;
 	std::vector<triangle> BoundingTriangles;
 	std::vector<Vec3D> BoundingNormals;
+	bool HasCustomCollision = false;
 
 	Vec3D VertexBox[2];
 	float VertexRadius;
