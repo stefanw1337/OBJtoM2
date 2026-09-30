@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <sstream>
 #include <algorithm>
+#include <stdexcept>
 
 #include "m2.h"
 
@@ -85,6 +86,7 @@ void m2::saveToFile(std::string path)
 {
 	std::cout << "Saving file" << std::endl;
 	std::ofstream output;
+	output.exceptions(std::ios::failbit | std::ios::badbit);
 	output.open(path, std::ios::binary);
 	
 	// first the model header
@@ -127,6 +129,7 @@ void m2::saveToFile(std::string path)
 	writeLookupTable(output, AttachLookupTable);
 	writeLookupTable(output, CameraLookupTable);
 
+	output.close();
 	writeViews(path);
 }
 
@@ -833,6 +836,7 @@ void m2::writeViews(std::string path)
 {
 	std::string name = removeExtension(path);
 	std::ofstream skinFile;
+	skinFile.exceptions(std::ios::failbit | std::ios::badbit);
 	uint32 position = 0;
 
 	for(int i = 0; i < Views.size(); i++)
